@@ -1,5 +1,5 @@
 import express from "express";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import "dotenv/config";
 import cors from "cors";
 import { createRemoteJWKSet, jwtVerify } from "jose";
@@ -71,6 +71,15 @@ app.get("/books", async (req, res) => {
   const books = await booksCollection.find().sort({ createdAt: -1 }).toArray();
   res.send(books);
 });
+
+//book details page api
+app.get("/books/:id", async(req, res) => {
+   const {id} = req.params;
+   const result = await booksCollection.findOne({_id: new ObjectId(id)});
+   res.send(result)
+})
+
+
 //my-book
 app.get("/my-book", verifyToken, async (req, res) => {
   const userEmail = req.user.email;
