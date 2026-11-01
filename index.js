@@ -71,8 +71,12 @@ app.get("/books", async (req, res) => {
   const books = await booksCollection.find().sort({ createdAt: -1 }).toArray();
   res.send(books);
 });
-
-
+//my-book
+app.get("/my-book", verifyToken, async (req, res) => {
+  const userEmail = req.user.email;
+  const books = await booksCollection.find({userEmail: userEmail}).sort({ createdAt: -1 }).toArray();
+  res.send(books);
+});
 
 //http://localhost:8000
 app.get("/", (req, res) => {
