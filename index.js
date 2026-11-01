@@ -28,6 +28,7 @@ export async function connectToMongoDB() {
 const mongoClient = await connectToMongoDB();
 const db = mongoClient.db("book-nook");
 const booksCollection = db.collection("books");
+const borrowCollection = db.collection("borrows")
 
 // Auth Middleware
 const verifyToken = async (req, res, next) => {
@@ -86,6 +87,51 @@ app.get("/my-book", verifyToken, async (req, res) => {
   const books = await booksCollection.find({userEmail: userEmail}).sort({ createdAt: -1 }).toArray();
   res.send(books);
 });
+
+
+// borrow  post api
+app.post("/borrows", async(req, res) => {
+  const borrowData = req.body;
+  const bookObjectId = new ObjectId(borrowData.bookId);
+
+  //check already borrow 
+  const existingBorrow = await borrowCollection.findOne({
+    bookId: borrowData.bookId,
+    borrowerEmail: borrowData.borrowerEmail,
+  })
+ 
+
+  if(existingBorrow){
+    return res.status(400).send({ message: "You have already borrowed this book!" });
+  }
+
+;
+
+  // available copies 
+const book = await booksCollection.findOne({ _id: bookObjectId });
+
+//check 
+// console.log("Received bookId:", bookObjectId);
+// console.log("Found book:", book);
+// console.log("Available copies:", book?.availableCopies)
+
+  if (!book || book.availableCopies <= 0) {
+    return res.status(400).send({ message: "No copies available right now." });
+  }
+ 
+  const result = await borrowCollection.insertOne(borrowData);
+   await booksCollection.updateOne(
+    {_id: bookObjectId},
+    {$inc:{availableCopies: -1 }}
+   )
+
+
+  res.send(result)
+})
+
+
+
+
 
 //http://localhost:8000
 app.get("/", (req, res) => {
