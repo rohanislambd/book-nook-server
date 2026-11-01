@@ -38,6 +38,12 @@ app.post('/books', async(req, res) => {
      res.send(result)
 })
 
+//all book api
+app.get("/books", async(req, res) => {
+    const books = await booksCollection.find().sort({createdAt: -1}).toArray();
+    res.send(books);
+})
+
 
 //http://localhost:8000
 app.get('/', (req, res)=> {
