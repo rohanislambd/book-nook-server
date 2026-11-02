@@ -138,7 +138,33 @@ app.patch("/books/:id", verifyToken, async (req, res) => {
 });
 
 
-//my book update patech
+//my book delete api 
+ app.delete("/books/:id",verifyToken,async(req, res) => {
+    const id = req.params.id
+    const requestedEmail = req.user.email
+      // find book
+      const book = await booksCollection.findOne({_id: new ObjectId(id)});
+        
+      if(!book){
+        return res.status(404).send({ message: "Book not found!" });
+      }
+
+      // check book owership before allowing the delte
+      if(book.userEmail !== requestedEmail){
+        return res.status(403).send({
+      message: "Forbidden! You can only delete your own books.",});
+      }
+
+
+      // delete book
+      const result = await booksCollection.deleteOne({
+        _id:new ObjectId(id),
+        userEmail: requestedEmail,
+      })
+      res.send(result)
+
+ })
+
 
 // borrow  post api
 app.post("/borrows", verifyToken, async (req, res) => {
