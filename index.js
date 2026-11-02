@@ -61,7 +61,7 @@ const verifyToken = async (req, res, next) => {
 
 // post api : book add
 
-app.post("/books", async (req, res) => {
+app.post("/books",verifyToken, async (req, res) => {
   const newBook = req.body;
   const result = await booksCollection.insertOne(newBook);
   res.send(result);
@@ -74,7 +74,7 @@ app.get("/books", async (req, res) => {
 });
 
 //book details page api
-app.get("/books/:id", async(req, res) => {
+app.get("/books/:id",verifyToken, async(req, res) => {
    const {id} = req.params;
    const result = await booksCollection.findOne({_id: new ObjectId(id)});
    res.send(result)
@@ -129,7 +129,7 @@ const book = await booksCollection.findOne({ _id: bookObjectId });
 })
 
 
-// Check existing borrow API
+
 // Check existing borrow API
 app.get("/borrows/check", verifyToken, async (req, res) => {
   const { bookId } = req.query;
