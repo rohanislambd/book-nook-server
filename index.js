@@ -87,6 +87,46 @@ app.get("/my-book", verifyToken, async (req, res) => {
   res.send(books);
 });
 
+//my book update patch api
+app.patch("/books/:id", verifyToken, async (req, res) => {
+  const id = req.params.id;
+  const updateData = req.body;
+  const requestedEmail = req.user.email;
+  //  find book
+  const book = await booksCollection.findOne({ _id: new ObjectId(id) });
+
+  // Check book ownership before allowing the update
+
+  if (book.userEmail !== requestedEmail) {
+    return res.status(403).send({
+      message: "Forbidden! You can only edit your own books.",
+    });
+  }
+
+  const newAvailable = Number(updateData.availableCopies);
+  if (Number.isNaN(newAvailable) || newAvailable < 0) {
+    return res.status(400).send({ message: "Invalid availableCopies" });
+  }
+
+  const result = await booksCollection.updateOne(
+    { _id: new ObjectId(id), userEmail: requestedEmail },
+    [
+      {
+        $set: {
+          title: updateData.title ?? book.title,
+          author: updateData.author ?? book.author,
+          category: updateData.category ?? book.category,
+          coverImage: updateData.coverImage ?? book.coverImage,
+          description: updateData.description ?? book.description,
+          availableCopies: newAvailable,
+          totalCopies: { $max: ["$totalCopies", newAvailable] },
+        },
+      },
+    ],
+  );
+  res.send(result);
+});
+
 // borrow  post api
 app.post("/borrows", verifyToken, async (req, res) => {
   const borrowData = req.body;
@@ -142,11 +182,12 @@ app.get("/borrows/check", verifyToken, async (req, res) => {
   res.send({ alreadyBorrowed: false });
 });
 
+//my borrow book auto return
 // Automatically return books when their returnDate has passed
 const autoReturnExpiredBooks = async () => {
   const today = new Date().toISOString().split("T")[0];
   // 1. Find borrowed books whose returnDate is earlier than today's date ($lt)
-  const expiredBorrows = await borrowsCollection
+  const expiredBorrows = await borrowCollection
     .find({ returnDate: { $lt: today } })
     .toArray();
   // 2. Delete each expired borrow record and increase the available copies of the book by 1
@@ -161,9 +202,9 @@ const autoReturnExpiredBooks = async () => {
 
 //my borrow get api
 app.get("/borrows", verifyToken, async (req, res) => {
-  const email = req.user.email;
   // check auto retun
   await autoReturnExpiredBooks();
+  const email = req.user.email;
 
   const result = await borrowCollection
     .find({ borrowerEmail: email })
