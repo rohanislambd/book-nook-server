@@ -90,7 +90,7 @@ app.get("/my-book", verifyToken, async (req, res) => {
 
 
 // borrow  post api
-app.post("/borrows", async(req, res) => {
+app.post("/borrows",verifyToken, async(req, res) => {
   const borrowData = req.body;
   const bookObjectId = new ObjectId(borrowData.bookId);
 
@@ -130,11 +130,12 @@ const book = await booksCollection.findOne({ _id: bookObjectId });
 
 
 // Check existing borrow API
+// Check existing borrow API
+app.get("/borrows/check", verifyToken, async (req, res) => {
+  const { bookId } = req.query;
+  const borrowerEmail = req.user.email;
 
-app.get("/borrows/check", async(req, res) => {
-
-    const { bookId, borrowerEmail } = req.query;
-    const existingBorrow = await borrowCollection.findOne({
+  const existingBorrow = await borrowCollection.findOne({
     bookId,
     borrowerEmail,
   });
@@ -142,9 +143,9 @@ app.get("/borrows/check", async(req, res) => {
   if (existingBorrow) {
     return res.send({ alreadyBorrowed: true });
   }
-   res.send({alreadyBorrowed:false});
-})
 
+  res.send({ alreadyBorrowed: false });
+});
 
 
 
