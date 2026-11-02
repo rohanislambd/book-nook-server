@@ -94,6 +94,9 @@ app.patch("/books/:id", verifyToken, async (req, res) => {
   const requestedEmail = req.user.email;
   //  find book
   const book = await booksCollection.findOne({ _id: new ObjectId(id) });
+   if (!book) {
+    return res.status(404).send({ message: "Book not found!" });
+  }
 
   // Check book ownership before allowing the update
 
@@ -108,9 +111,16 @@ app.patch("/books/:id", verifyToken, async (req, res) => {
     return res.status(400).send({ message: "Invalid availableCopies" });
   }
 
+  // 4. Calculate new totalCopies 
+  const oldTotal = Number(book.totalCopies) || 0;
+  const oldAvailable = Number(book.availableCopies) || 0;
+  const borrowedCount = Math.max(0, oldTotal - oldAvailable);
+  // Calculate total copies by adding the number of already borrowed books.
+  const newTotalCopies = newAvailable + borrowedCount;  
+
   const result = await booksCollection.updateOne(
     { _id: new ObjectId(id), userEmail: requestedEmail },
-    [
+    
       {
         $set: {
           title: updateData.title ?? book.title,
@@ -118,14 +128,17 @@ app.patch("/books/:id", verifyToken, async (req, res) => {
           category: updateData.category ?? book.category,
           coverImage: updateData.coverImage ?? book.coverImage,
           description: updateData.description ?? book.description,
-          availableCopies: newAvailable,
-          totalCopies: { $max: ["$totalCopies", newAvailable] },
+         availableCopies: newAvailable,
+        totalCopies: newTotalCopies,
         },
       },
-    ],
+    
   );
   res.send(result);
 });
+
+
+//my book update patech
 
 // borrow  post api
 app.post("/borrows", verifyToken, async (req, res) => {
