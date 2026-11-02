@@ -105,7 +105,6 @@ app.post("/borrows", async(req, res) => {
     return res.status(400).send({ message: "You have already borrowed this book!" });
   }
 
-;
 
   // available copies 
 const book = await booksCollection.findOne({ _id: bookObjectId });
@@ -129,6 +128,22 @@ const book = await booksCollection.findOne({ _id: bookObjectId });
   res.send(result)
 })
 
+
+// Check existing borrow API
+
+app.get("/borrows/check", async(req, res) => {
+
+    const { bookId, borrowerEmail } = req.query;
+    const existingBorrow = await borrowCollection.findOne({
+    bookId,
+    borrowerEmail,
+  });
+
+  if (existingBorrow) {
+    return res.send({ alreadyBorrowed: true });
+  }
+   res.send({alreadyBorrowed:false});
+})
 
 
 
