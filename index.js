@@ -4,7 +4,6 @@ import "dotenv/config";
 import cors from "cors";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
-
 const app = express();
 const PORT = 8000;
 
@@ -29,7 +28,7 @@ export async function connectToMongoDB() {
 const mongoClient = await connectToMongoDB();
 const db = mongoClient.db("book-nook");
 const booksCollection = db.collection("books");
-const borrowCollection = db.collection("borrows")
+const borrowCollection = db.collection("borrows");
 
 // Auth Middleware
 const verifyToken = async (req, res, next) => {
@@ -38,7 +37,7 @@ const verifyToken = async (req, res, next) => {
     return res.status(401).send({ message: "Unauthorized access" });
   }
   const token = authHeader.split(" ")[1];
-  
+
   if (!token) {
     return res.status(401).send({ message: "Unauthorized access" });
   }
@@ -51,18 +50,15 @@ const verifyToken = async (req, res, next) => {
     req.user = payload;
     next();
   } catch (error) {
-     return res.status(401).send({
-    message: "Unauthorized access",
-  });
+    return res.status(401).send({
+      message: "Unauthorized access",
+    });
   }
-  
 };
-
-
 
 // post api : book add
 
-app.post("/books",verifyToken, async (req, res) => {
+app.post("/books", verifyToken, async (req, res) => {
   const newBook = req.body;
   const result = await booksCollection.insertOne(newBook);
   res.send(result);
@@ -75,61 +71,59 @@ app.get("/books", async (req, res) => {
 });
 
 //book details page api
-app.get("/books/:id",verifyToken, async(req, res) => {
-   const {id} = req.params;
-   const result = await booksCollection.findOne({_id: new ObjectId(id)});
-   res.send(result)
-})
-
+app.get("/books/:id", verifyToken, async (req, res) => {
+  const { id } = req.params;
+  const result = await booksCollection.findOne({ _id: new ObjectId(id) });
+  res.send(result);
+});
 
 //my-book
 app.get("/my-book", verifyToken, async (req, res) => {
   const userEmail = req.user.email;
-  const books = await booksCollection.find({userEmail: userEmail}).sort({ createdAt: -1 }).toArray();
+  const books = await booksCollection
+    .find({ userEmail: userEmail })
+    .sort({ createdAt: -1 })
+    .toArray();
   res.send(books);
 });
 
-
 // borrow  post api
-app.post("/borrows",verifyToken, async(req, res) => {
+app.post("/borrows", verifyToken, async (req, res) => {
   const borrowData = req.body;
   const bookObjectId = new ObjectId(borrowData.bookId);
 
-  //check already borrow 
+  //check already borrow
   const existingBorrow = await borrowCollection.findOne({
     bookId: borrowData.bookId,
     borrowerEmail: borrowData.borrowerEmail,
-  })
- 
+  });
 
-  if(existingBorrow){
-    return res.status(400).send({ message: "You have already borrowed this book!" });
+  if (existingBorrow) {
+    return res
+      .status(400)
+      .send({ message: "You have already borrowed this book!" });
   }
 
+  // available copies
+  const book = await booksCollection.findOne({ _id: bookObjectId });
 
-  // available copies 
-const book = await booksCollection.findOne({ _id: bookObjectId });
-
-//check 
-// console.log("Received bookId:", bookObjectId);
-// console.log("Found book:", book);
-// console.log("Available copies:", book?.availableCopies)
+  //check
+  // console.log("Received bookId:", bookObjectId);
+  // console.log("Found book:", book);
+  // console.log("Available copies:", book?.availableCopies)
 
   if (!book || book.availableCopies <= 0) {
     return res.status(400).send({ message: "No copies available right now." });
   }
- 
+
   const result = await borrowCollection.insertOne(borrowData);
-   await booksCollection.updateOne(
-    {_id: bookObjectId},
-    {$inc:{availableCopies: -1 }}
-   )
+  await booksCollection.updateOne(
+    { _id: bookObjectId },
+    { $inc: { availableCopies: -1 } },
+  );
 
-
-  res.send(result)
-})
-
-
+  res.send(result);
+});
 
 // Check existing borrow API
 app.get("/borrows/check", verifyToken, async (req, res) => {
@@ -148,40 +142,61 @@ app.get("/borrows/check", verifyToken, async (req, res) => {
   res.send({ alreadyBorrowed: false });
 });
 
+// Automatically return books when their returnDate has passed
+const autoReturnExpiredBooks = async () => {
+  const today = new Date().toISOString().split("T")[0];
+  // 1. Find borrowed books whose returnDate is earlier than today's date ($lt)
+  const expiredBorrows = await borrowsCollection
+    .find({ returnDate: { $lt: today } })
+    .toArray();
+  // 2. Delete each expired borrow record and increase the available copies of the book by 1
+  for (const item of expiredBorrows) {
+    await borrowCollection.deleteOne({ _id: item._id });
+    await booksCollection.updateOne(
+      { _id: new ObjectId(item.bookId) },
+      { $inc: { availableCopies: 1 } },
+    );
+  }
+};
 
 //my borrow get api
-app.get("/borrows",verifyToken, async(req, res) =>{
+app.get("/borrows", verifyToken, async (req, res) => {
   const email = req.user.email;
-  // console.log(email);
-  const result = await borrowCollection.find({borrowerEmail: email}).sort({borrowDate: -1}).toArray();
-  
-  res.send(result)
-  
-})
+  // check auto retun
+  await autoReturnExpiredBooks();
 
+  const result = await borrowCollection
+    .find({ borrowerEmail: email })
+    .sort({ borrowDate: -1 })
+    .toArray();
 
-// my borrow delete api 
+  res.send(result);
+});
+
+// my borrow delete api
 app.delete("/borrows/:id", verifyToken, async (req, res) => {
-   const borrowId = req.params.id;
-   const email = req.user.email;
-  
-  const borrowRecord = await borrowCollection.findOne({ _id: new ObjectId(borrowId), borrowerEmail: email });
+  const borrowId = req.params.id;
+  const email = req.user.email;
+
+  const borrowRecord = await borrowCollection.findOne({
+    _id: new ObjectId(borrowId),
+    borrowerEmail: email,
+  });
   if (!borrowRecord) {
     return res.status(404).send({ message: "Borrow record not found!" });
   }
 
-  const result = await borrowCollection.deleteOne(
-    { _id: new ObjectId(borrowId) }
-  );
+  const result = await borrowCollection.deleteOne({
+    _id: new ObjectId(borrowId),
+  });
 
   await booksCollection.updateOne(
-    { _id: new ObjectId(borrowRecord.bookId) }, 
-    { $inc: { availableCopies: 1 } }
+    { _id: new ObjectId(borrowRecord.bookId) },
+    { $inc: { availableCopies: 1 } },
   );
 
   res.send({ message: "Book returned successfully!", result });
-})
-
+});
 
 //http://localhost:8000
 app.get("/", (req, res) => {
