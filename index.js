@@ -4,6 +4,7 @@ import "dotenv/config";
 import cors from "cors";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
+
 const app = express();
 const PORT = 8000;
 
@@ -146,6 +147,17 @@ app.get("/borrows/check", verifyToken, async (req, res) => {
 
   res.send({ alreadyBorrowed: false });
 });
+
+
+//my borrow get api
+app.get("/borrows",verifyToken, async(req, res) =>{
+  const email = req.user.email;
+  // console.log(email);
+  const result = await borrowCollection.find({borrowerEmail: email}).sort({borrowDate: -1}).toArray();
+  
+  res.send(result)
+  
+})
 
 
 
