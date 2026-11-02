@@ -160,6 +160,28 @@ app.get("/borrows",verifyToken, async(req, res) =>{
 })
 
 
+// my borrow delete api 
+app.delete("/borrows/:id", verifyToken, async (req, res) => {
+   const borrowId = req.params.id;
+   const email = req.user.email;
+  
+  const borrowRecord = await borrowCollection.findOne({ _id: new ObjectId(borrowId), borrowerEmail: email });
+  if (!borrowRecord) {
+    return res.status(404).send({ message: "Borrow record not found!" });
+  }
+
+  const result = await borrowCollection.deleteOne(
+    { _id: new ObjectId(borrowId) }
+  );
+
+  await booksCollection.updateOne(
+    { _id: new ObjectId(borrowRecord.bookId) }, 
+    { $inc: { availableCopies: 1 } }
+  );
+
+  res.send({ message: "Book returned successfully!", result });
+})
+
 
 //http://localhost:8000
 app.get("/", (req, res) => {
