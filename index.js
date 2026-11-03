@@ -70,6 +70,13 @@ app.get("/books", async (req, res) => {
   res.send(books);
 });
 
+//home page book get api
+app.get("/bookshome", async (req, res) => {
+  const books = await booksCollection.find().sort({ createdAt: -1 }).limit(6).toArray();
+  res.send(books);
+});
+
+
 //book details page api
 app.get("/books/:id", verifyToken, async (req, res) => {
   const { id } = req.params;
